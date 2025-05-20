@@ -87,15 +87,18 @@ If you need to update the dashboard:
   - Generates comprehensive summaries with impact assessments and recommendations
   - Provides sources for further investigation
 
-### AI-Powered Features
+### On-Demand AI Analysis
 
-The dashboard now includes advanced AI features:
+The dashboard now includes on-demand AI analysis features:
 
-1. **Web Research**: Automatically searches the web for information about each breach
-2. **Impact Assessment**: Analyzes the severity and potential impact of the breach
-3. **Personalized Recommendations**: Provides specific recommendations based on breach type
-4. **Source Tracking**: Lists sources used in the research for verification
-5. **Interactive Dashboard**: Filter breaches by severity, portal, or search terms
+1. **User-Triggered Analysis**: Users can request AI analysis for any breach with a single click
+2. **Web Research**: Searches the web for information about the selected breach
+3. **Impact Assessment**: Analyzes the severity and potential impact of the breach
+4. **Personalized Recommendations**: Provides specific recommendations based on breach type
+5. **Source Tracking**: Lists sources used in the research for verification
+6. **Interactive Dashboard**: Filter breaches by severity, portal, or search terms
+
+This on-demand approach gives users control over when to use AI resources and allows them to focus analysis on the breaches they're most interested in.
 
 ## Troubleshooting
 

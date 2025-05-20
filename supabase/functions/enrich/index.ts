@@ -48,6 +48,25 @@ serve(async (req) => {
 
     const supa = createClient(supabaseUrl, supabaseKey);
 
+    // Check if this breach already has an AI analysis
+    const { data: existingAnalysis } = await supa
+      .from('breach_ai')
+      .select('summary')
+      .eq('hash', row.hash)
+      .single();
+
+    // If analysis already exists and this isn't a forced refresh, return it
+    if (existingAnalysis && existingAnalysis.summary && !req.headers.get('x-force-refresh')) {
+      console.log(`Returning existing analysis for breach ${row.hash}`);
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Using existing analysis",
+        summary: existingAnalysis.summary
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // Step 1: Research the breach using Firecrawl
     const researchResult = await researchBreach(row, firecrawlApiKey);
 
@@ -55,12 +74,24 @@ serve(async (req) => {
     const summary = await generateSummary(row, researchResult);
 
     // Step 3: Store the summary in Supabase
-    await supa.from('breach_ai').insert({
-      hash: row.hash,
-      summary: summary
-    });
+    if (existingAnalysis) {
+      // Update existing record
+      await supa.from('breach_ai').update({
+        summary: summary
+      }).eq('hash', row.hash);
+    } else {
+      // Insert new record
+      await supa.from('breach_ai').insert({
+        hash: row.hash,
+        summary: summary
+      });
+    }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Analysis completed successfully",
+      summary: summary
+    }), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (error) {

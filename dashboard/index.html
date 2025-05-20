@@ -27,6 +27,50 @@
     .portal-filter { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background-color: #f5f5f5; }
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background-color: #007bff;
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #0069d9;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background-color: #5a6268;
+    }
+    .ai-analysis-section {
+      border-top: 1px solid #ddd;
+      margin-top: 20px;
+      padding-top: 15px;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #007bff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .actions-column {
+      white-space: nowrap;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -52,10 +96,6 @@
   <h3 id="breach-title">Breach Details</h3>
   <div class="breach-details-grid">
     <div class="breach-details-section">
-      <h4>Impact Assessment</h4>
-      <p id="impact-assessment"></p>
-    </div>
-    <div class="breach-details-section">
       <h4>Breach Information</h4>
       <p><strong>Entity:</strong> <span id="detail-entity"></span></p>
       <p><strong>Records Affected:</strong> <span id="detail-records"></span></p>
@@ -66,19 +106,50 @@
       <p><strong>State:</strong> <span id="detail-state"></span></p>
     </div>
     <div class="breach-details-section">
-      <h4>Recommendations</h4>
-      <ul id="recommendations" class="recommendations"></ul>
-    </div>
-    <div class="breach-details-section">
-      <h4>AI Analysis</h4>
-      <p id="ai-summary"></p>
+      <h4>Basic Recommendations</h4>
+      <ul class="recommendations">
+        <li>Monitor your accounts for suspicious activity.</li>
+        <li>Consider changing passwords for affected accounts.</li>
+        <li>Be cautious of phishing attempts related to this breach.</li>
+      </ul>
     </div>
   </div>
-  <div class="breach-details-section">
-    <h4>Sources</h4>
-    <div id="sources" class="sources"></div>
+
+  <div id="ai-analysis-container" class="ai-analysis-section">
+    <h4>AI Analysis</h4>
+    <div id="ai-analysis-placeholder">
+      <p>AI analysis is available on-demand for this breach.</p>
+      <button id="run-ai-analysis" class="btn btn-primary">Run AI Analysis</button>
+    </div>
+    <div id="ai-analysis-loading" style="display: none;">
+      <div class="loading-spinner"></div>
+      <span>Analyzing breach data... This may take a minute.</span>
+    </div>
+    <div id="ai-analysis-results" style="display: none;">
+      <div class="breach-details-grid">
+        <div class="breach-details-section">
+          <h4>Impact Assessment</h4>
+          <p id="impact-assessment"></p>
+        </div>
+        <div class="breach-details-section">
+          <h4>AI Summary</h4>
+          <p id="ai-summary"></p>
+        </div>
+        <div class="breach-details-section">
+          <h4>Personalized Recommendations</h4>
+          <ul id="recommendations" class="recommendations"></ul>
+        </div>
+        <div class="breach-details-section">
+          <h4>Sources</h4>
+          <div id="sources" class="sources"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <button id="close-details" style="margin-top: 15px; padding: 8px 15px;">Close Details</button>
+
+  <div style="margin-top: 15px;">
+    <button id="close-details" class="btn btn-secondary">Close Details</button>
+  </div>
 </div>
 
 <script type="module">
@@ -136,19 +207,27 @@ function renderTable(data) {
             <th>Type</th>
             <th>Portal</th>
             <th>Severity</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           ${data.map((r, index) => {
             const severity = r.breach_ai?.summary?.severity || getSeverityFromRecords(r.records);
+            const hasAiAnalysis = r.breach_ai && r.breach_ai.summary;
             return `
-              <tr class="clickable-row" data-index="${index}">
+              <tr>
                 <td>${r.notice_date || ""}</td>
                 <td>${r.entity || ""}</td>
                 <td>${formatNumber(r.records)}</td>
                 <td>${r.breach_type || ""}</td>
                 <td>${r._portal || ""}</td>
                 <td class="${severity}">${severity.toUpperCase()}</td>
+                <td class="actions-column">
+                  <button class="btn btn-secondary view-details-btn" data-index="${index}">Details</button>
+                  ${hasAiAnalysis ?
+                    `<span title="AI analysis already available" style="color: green; margin-left: 5px;">✓</span>` :
+                    ''}
+                </td>
               </tr>
             `;
           }).join("")}
@@ -156,10 +235,10 @@ function renderTable(data) {
       </table>
     `;
 
-    // Add click event to rows
-    document.querySelectorAll('.clickable-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const index = row.getAttribute('data-index');
+    // Add click event to view details buttons
+    document.querySelectorAll('.view-details-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const index = btn.getAttribute('data-index');
         showBreachDetails(data[index]);
       });
     });
@@ -202,8 +281,14 @@ searchBox.addEventListener('input', applyFilters);
 severityFilter.addEventListener('change', applyFilters);
 portalFilter.addEventListener('change', applyFilters);
 
+// Global variable to store the current breach being viewed
+let currentBreach = null;
+
 // Breach details functionality
 function showBreachDetails(breach) {
+  // Store the current breach for use in the AI analysis
+  currentBreach = breach;
+
   const detailsElement = document.getElementById('breach-details');
 
   // Set basic details
@@ -215,58 +300,24 @@ function showBreachDetails(breach) {
   document.getElementById('detail-type').textContent = breach.breach_type || 'Unknown';
   document.getElementById('detail-state').textContent = breach.state || 'Unknown';
 
-  // Set AI-enhanced details if available
+  // Set severity based on records
+  const severity = getSeverityFromRecords(breach.records);
+  document.getElementById('detail-severity').textContent = severity.toUpperCase();
+  document.getElementById('detail-severity').className = severity;
+
+  // Handle AI analysis section
+  const aiPlaceholder = document.getElementById('ai-analysis-placeholder');
+  const aiLoading = document.getElementById('ai-analysis-loading');
+  const aiResults = document.getElementById('ai-analysis-results');
+
+  // Reset AI sections
+  aiPlaceholder.style.display = 'block';
+  aiLoading.style.display = 'none';
+  aiResults.style.display = 'none';
+
+  // If AI analysis is already available, show it
   if (breach.breach_ai && breach.breach_ai.summary) {
-    const summary = breach.breach_ai.summary;
-
-    document.getElementById('detail-severity').textContent = summary.severity.toUpperCase();
-    document.getElementById('detail-severity').className = summary.severity;
-
-    document.getElementById('impact-assessment').textContent = summary.impact_assessment || '';
-    document.getElementById('ai-summary').textContent = summary.text || '';
-
-    // Recommendations
-    const recommendationsElement = document.getElementById('recommendations');
-    recommendationsElement.innerHTML = '';
-    if (summary.recommendations && summary.recommendations.length > 0) {
-      summary.recommendations.forEach(rec => {
-        const li = document.createElement('li');
-        li.textContent = rec;
-        recommendationsElement.appendChild(li);
-      });
-    } else {
-      recommendationsElement.innerHTML = '<li>No specific recommendations available.</li>';
-    }
-
-    // Sources
-    const sourcesElement = document.getElementById('sources');
-    sourcesElement.innerHTML = '';
-    if (summary.sources && summary.sources.length > 0) {
-      summary.sources.forEach(source => {
-        const p = document.createElement('p');
-        p.innerHTML = `<a href="${source}" target="_blank">${source}</a>`;
-        sourcesElement.appendChild(p);
-      });
-    } else {
-      sourcesElement.textContent = 'No external sources available.';
-    }
-  } else {
-    // Default values if no AI summary
-    const severity = getSeverityFromRecords(breach.records);
-    document.getElementById('detail-severity').textContent = severity.toUpperCase();
-    document.getElementById('detail-severity').className = severity;
-
-    document.getElementById('impact-assessment').textContent =
-      `This breach at ${breach.entity} has affected ${formatNumber(breach.records)} individuals.`;
-
-    document.getElementById('ai-summary').textContent =
-      'No AI analysis available for this breach.';
-
-    document.getElementById('recommendations').innerHTML =
-      '<li>Monitor your accounts for suspicious activity.</li>' +
-      '<li>Consider changing passwords for affected accounts.</li>';
-
-    document.getElementById('sources').textContent = 'No external sources available.';
+    showAiResults(breach.breach_ai.summary);
   }
 
   // Show the details
@@ -276,9 +327,131 @@ function showBreachDetails(breach) {
   detailsElement.scrollIntoView({ behavior: 'smooth' });
 }
 
+// Function to display AI results
+function showAiResults(summary) {
+  const aiPlaceholder = document.getElementById('ai-analysis-placeholder');
+  const aiLoading = document.getElementById('ai-analysis-loading');
+  const aiResults = document.getElementById('ai-analysis-results');
+
+  // Update AI results
+  document.getElementById('impact-assessment').textContent = summary.impact_assessment || '';
+  document.getElementById('ai-summary').textContent = summary.text || '';
+
+  // Recommendations
+  const recommendationsElement = document.getElementById('recommendations');
+  recommendationsElement.innerHTML = '';
+  if (summary.recommendations && summary.recommendations.length > 0) {
+    summary.recommendations.forEach(rec => {
+      const li = document.createElement('li');
+      li.textContent = rec;
+      recommendationsElement.appendChild(li);
+    });
+  } else {
+    recommendationsElement.innerHTML = '<li>No specific recommendations available.</li>';
+  }
+
+  // Sources
+  const sourcesElement = document.getElementById('sources');
+  sourcesElement.innerHTML = '';
+  if (summary.sources && summary.sources.length > 0) {
+    summary.sources.forEach(source => {
+      const p = document.createElement('p');
+      p.innerHTML = `<a href="${source}" target="_blank">${source}</a>`;
+      sourcesElement.appendChild(p);
+    });
+  } else {
+    sourcesElement.textContent = 'No external sources available.';
+  }
+
+  // Show results and hide other sections
+  aiPlaceholder.style.display = 'none';
+  aiLoading.style.display = 'none';
+  aiResults.style.display = 'block';
+
+  // Refresh the table to show the checkmark
+  renderTable(displayData);
+}
+
+// Function to request AI analysis
+async function requestAiAnalysis(breach) {
+  try {
+    // Show loading state
+    document.getElementById('ai-analysis-placeholder').style.display = 'none';
+    document.getElementById('ai-analysis-loading').style.display = 'block';
+
+    // Call the Edge Function to analyze the breach
+    const response = await fetch(`${supa.supabaseUrl}/functions/v1/enrich`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supa.supabaseKey}`
+      },
+      body: JSON.stringify(breach)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status} ${response.statusText}`);
+    }
+
+    // Wait a moment to allow the database to update
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Fetch the updated breach data with AI analysis
+    const { data, error } = await supa
+      .from('breach_ai')
+      .select('summary')
+      .eq('hash', breach.hash)
+      .single();
+
+    if (error) {
+      throw new Error(`Error fetching AI analysis: ${error.message}`);
+    }
+
+    if (!data || !data.summary) {
+      throw new Error('No AI analysis data returned');
+    }
+
+    // Update the current breach with the AI analysis
+    if (!currentBreach.breach_ai) {
+      currentBreach.breach_ai = { summary: data.summary };
+    } else {
+      currentBreach.breach_ai.summary = data.summary;
+    }
+
+    // Update the display with the AI results
+    showAiResults(data.summary);
+
+    // Update the breach in the displayData array
+    const index = displayData.findIndex(b => b.hash === breach.hash);
+    if (index !== -1) {
+      displayData[index] = currentBreach;
+    }
+
+  } catch (error) {
+    console.error('Error requesting AI analysis:', error);
+
+    // Show error in the results section
+    document.getElementById('ai-analysis-placeholder').style.display = 'none';
+    document.getElementById('ai-analysis-loading').style.display = 'none';
+    document.getElementById('ai-analysis-results').style.display = 'block';
+
+    document.getElementById('impact-assessment').textContent = 'Error analyzing breach data.';
+    document.getElementById('ai-summary').textContent = `An error occurred: ${error.message}`;
+    document.getElementById('recommendations').innerHTML = '<li>Please try again later.</li>';
+    document.getElementById('sources').textContent = 'No sources available due to error.';
+  }
+}
+
 // Close details button
 document.getElementById('close-details').addEventListener('click', () => {
   document.getElementById('breach-details').style.display = 'none';
+});
+
+// Run AI Analysis button
+document.getElementById('run-ai-analysis').addEventListener('click', () => {
+  if (currentBreach) {
+    requestAiAnalysis(currentBreach);
+  }
 });
 
 // Helper functions
