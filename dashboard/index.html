@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<body>
+<h2>Latest breaches</h2>
+<div id="tbl">Loading…</div>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+const supa = createClient("https://ejltctxcnootgerwxneq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqbHRjdHhjbm9vdGdlcnd4bmVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MTYzODUsImV4cCI6MjA2MzE5MjM4NX0.SCe8tnVQGui8XtAsKBNa7RrVKpoi9VXLbJ-tl50s73c"); // Replace with your Supabase project URL and anon key
+const { data } = await supa.from("breach_raw").select("*").order("inserted_at",{ascending:false}).limit(50);
+document.getElementById("tbl").innerHTML =
+  `<table border=1><tr><th>Date</th><th>Entity</th><th>Records</th></tr>`+
+  data.map(r=>`<tr><td>${r.notice_date||""}</td><td>${r.entity}</td><td>${r.records}</td></tr>`).join("")
+  +`</table>`;
+</script>
+</body>
+</html> 
