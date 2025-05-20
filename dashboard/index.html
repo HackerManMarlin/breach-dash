@@ -47,27 +47,41 @@ if (!breaches || breaches.length === 0) {
 }
 
 // Format the table
-document.getElementById("tbl").innerHTML = `
-  <table>
-    <tr>
-      <th>Date</th>
-      <th>Entity</th>
-      <th>Records</th>
-      <th>Portal</th>
-      ${breaches && breaches.length > 0 ? '<th>AI Summary</th>' : ''}
-    </tr>
-    ${displayData.map(r => `
+if (!displayData || displayData.length === 0) {
+  document.getElementById("tbl").innerHTML = `
+    <div style="padding: 20px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
+      <p>No breach data available. This could be because:</p>
+      <ul style="text-align: left; display: inline-block;">
+        <li>The GitHub Actions workflow hasn't run yet</li>
+        <li>The scrapers haven't found any new breaches</li>
+        <li>There might be an issue with the Supabase connection</li>
+      </ul>
+      <p>Check the GitHub Actions logs for more information.</p>
+    </div>
+  `;
+} else {
+  document.getElementById("tbl").innerHTML = `
+    <table>
       <tr>
-        <td>${r.notice_date || ""}</td>
-        <td>${r.entity || ""}</td>
-        <td class="${getSeverityClass(r.records)}">${formatNumber(r.records)}</td>
-        <td>${r._portal || ""}</td>
-        ${r.breach_ai ? `<td class="summary">${r.breach_ai.summary.text || ""}</td>` :
-          breaches && breaches.length > 0 ? '<td></td>' : ''}
+        <th>Date</th>
+        <th>Entity</th>
+        <th>Records</th>
+        <th>Portal</th>
+        ${breaches && breaches.length > 0 ? '<th>AI Summary</th>' : ''}
       </tr>
-    `).join("")}
-  </table>
-`;
+      ${displayData.map(r => `
+        <tr>
+          <td>${r.notice_date || ""}</td>
+          <td>${r.entity || ""}</td>
+          <td class="${getSeverityClass(r.records)}">${formatNumber(r.records)}</td>
+          <td>${r._portal || ""}</td>
+          ${r.breach_ai ? `<td class="summary">${r.breach_ai.summary.text || ""}</td>` :
+            breaches && breaches.length > 0 ? '<td></td>' : ''}
+        </tr>
+      `).join("")}
+    </table>
+  `;
+}
 
 // Helper functions
 function getSeverityClass(records) {
