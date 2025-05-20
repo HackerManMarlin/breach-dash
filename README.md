@@ -19,12 +19,14 @@ The repository structure is already set up with the following components:
 - `.github/workflows/` - GitHub Actions workflow
 - `supabase/` - Supabase setup files
 
-### 2. Supabase Setup
+### 2. Supabase Setup (Using MCP)
 
-1. Create a free Supabase project
+1. Create a free Supabase project (or use an existing one)
 2. Note your SUPABASE_URL and service role key (SUPABASE_KEY)
-3. Run the SQL in `supabase/setup.sql` in the Supabase SQL Editor
-4. If you don't need Slack alerts, remove the http_post lines before running
+3. The database tables and Edge Functions have been set up automatically using Supabase MCP
+4. If you want to modify the Slack notification settings:
+   - Go to the SQL Editor in your Supabase dashboard
+   - Modify the `notify_big` function to update the webhook URL or threshold
 
 ### 3. Apify Setup (for JS-heavy portals)
 
@@ -65,7 +67,9 @@ Your dashboard will be available at `https://<username>.github.io/breach-dash/`
 
 - Add more portals by updating `scrapers/config.yaml`
 - Modify the dashboard in `dashboard/index.html`
-- Enhance with Edge Functions for AI summaries
+- The Edge Function for AI summaries is already set up
+  - You can modify it in the Supabase dashboard under Edge Functions > enrich
+  - Implement your preferred AI integration (e.g., OpenAI, Claude) in the Edge Function
 
 ## Cost
 

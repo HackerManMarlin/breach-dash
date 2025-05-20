@@ -13,3 +13,12 @@ def insert_row(row):
                       json=[row], params={"select":"hash"})
     if not r.ok:
         print("supabase error", r.text)
+    else:
+        # Call the Edge Function to enrich the data with AI summaries
+        try:
+            enrich_url = f"{SUPA}/functions/v1/enrich"
+            enrich_response = requests.post(enrich_url, headers=HDR, json=row)
+            if not enrich_response.ok:
+                print(f"enrich function error: {enrich_response.text}")
+        except Exception as e:
+            print(f"enrich function exception: {str(e)}")

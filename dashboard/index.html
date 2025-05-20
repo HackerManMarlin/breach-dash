@@ -1,16 +1,86 @@
 <!doctype html>
 <html>
+<head>
+  <title>Breach Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { color: #333; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+    th { background-color: #f2f2f2; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    .high { color: #d9534f; font-weight: bold; }
+    .medium { color: #f0ad4e; }
+    .low { color: #5bc0de; }
+    .summary { font-style: italic; color: #666; }
+  </style>
+</head>
 <body>
-<h2>Latest breaches</h2>
+<h2>Latest Data Breaches</h2>
 <div id="tbl">Loading…</div>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-const supa = createClient("https://ejltctxcnootgerwxneq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqbHRjdHhjbm9vdGdlcnd4bmVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MTYzODUsImV4cCI6MjA2MzE5MjM4NX0.SCe8tnVQGui8XtAsKBNa7RrVKpoi9VXLbJ-tl50s73c"); // Replace with your Supabase project URL and anon key
-const { data } = await supa.from("breach_raw").select("*").order("inserted_at",{ascending:false}).limit(50);
-document.getElementById("tbl").innerHTML =
-  `<table border=1><tr><th>Date</th><th>Entity</th><th>Records</th></tr>`+
-  data.map(r=>`<tr><td>${r.notice_date||""}</td><td>${r.entity}</td><td>${r.records}</td></tr>`).join("")
-  +`</table>`;
+
+const supa = createClient("https://ejltctxcnootgerwxneq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqbHRjdHhjbm9vdGdlcnd4bmVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MTYzODUsImV4cCI6MjA2MzE5MjM4NX0.SCe8tnVQGui8XtAsKBNa7RrVKpoi9VXLbJ-tl50s73c");
+
+// Get breach data with AI summaries
+const { data: breaches } = await supa
+  .from("breach_raw")
+  .select(`
+    *,
+    breach_ai!inner (
+      summary
+    )
+  `)
+  .order("inserted_at", { ascending: false })
+  .limit(50);
+
+// Get all breach data if the join with AI summaries returns no results
+let displayData = breaches;
+if (!breaches || breaches.length === 0) {
+  const { data } = await supa
+    .from("breach_raw")
+    .select("*")
+    .order("inserted_at", { ascending: false })
+    .limit(50);
+  displayData = data;
+}
+
+// Format the table
+document.getElementById("tbl").innerHTML = `
+  <table>
+    <tr>
+      <th>Date</th>
+      <th>Entity</th>
+      <th>Records</th>
+      <th>Portal</th>
+      ${breaches && breaches.length > 0 ? '<th>AI Summary</th>' : ''}
+    </tr>
+    ${displayData.map(r => `
+      <tr>
+        <td>${r.notice_date || ""}</td>
+        <td>${r.entity || ""}</td>
+        <td class="${getSeverityClass(r.records)}">${formatNumber(r.records)}</td>
+        <td>${r._portal || ""}</td>
+        ${r.breach_ai ? `<td class="summary">${r.breach_ai.summary.text || ""}</td>` :
+          breaches && breaches.length > 0 ? '<td></td>' : ''}
+      </tr>
+    `).join("")}
+  </table>
+`;
+
+// Helper functions
+function getSeverityClass(records) {
+  if (!records) return "";
+  if (records >= 10000) return "high";
+  if (records >= 2500) return "medium";
+  return "low";
+}
+
+function formatNumber(num) {
+  if (!num) return "0";
+  return new Intl.NumberFormat().format(num);
+}
 </script>
 </body>
-</html> 
+</html>
