@@ -12,12 +12,75 @@
     .high { color: #d9534f; font-weight: bold; }
     .medium { color: #f0ad4e; }
     .low { color: #5bc0de; }
+    .critical { color: #d9534f; font-weight: bold; background-color: #f2dede; }
     .summary { font-style: italic; color: #666; }
+    .breach-details { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; display: none; }
+    .breach-details h3 { margin-top: 0; }
+    .breach-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .breach-details-section { margin-bottom: 15px; }
+    .breach-details-section h4 { margin-top: 0; margin-bottom: 5px; }
+    .recommendations { list-style-type: disc; padding-left: 20px; }
+    .sources { font-size: 0.9em; color: #666; }
+    .filter-controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+    .search-box { padding: 8px; border: 1px solid #ddd; border-radius: 4px; flex-grow: 1; max-width: 300px; }
+    .severity-filter { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .portal-filter { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background-color: #f5f5f5; }
   </style>
 </head>
 <body>
-<h2>Latest Data Breaches</h2>
+<h2>Data Breach Dashboard</h2>
+
+<div class="filter-controls">
+  <input type="text" id="search-box" class="search-box" placeholder="Search entities...">
+  <select id="severity-filter" class="severity-filter">
+    <option value="all">All Severities</option>
+    <option value="critical">Critical</option>
+    <option value="high">High</option>
+    <option value="medium">Medium</option>
+    <option value="low">Low</option>
+  </select>
+  <select id="portal-filter" class="portal-filter">
+    <option value="all">All Portals</option>
+  </select>
+</div>
+
 <div id="tbl">Loading…</div>
+
+<div id="breach-details" class="breach-details">
+  <h3 id="breach-title">Breach Details</h3>
+  <div class="breach-details-grid">
+    <div class="breach-details-section">
+      <h4>Impact Assessment</h4>
+      <p id="impact-assessment"></p>
+    </div>
+    <div class="breach-details-section">
+      <h4>Breach Information</h4>
+      <p><strong>Entity:</strong> <span id="detail-entity"></span></p>
+      <p><strong>Records Affected:</strong> <span id="detail-records"></span></p>
+      <p><strong>Date Reported:</strong> <span id="detail-notice-date"></span></p>
+      <p><strong>Breach Date:</strong> <span id="detail-breach-date"></span></p>
+      <p><strong>Severity:</strong> <span id="detail-severity"></span></p>
+      <p><strong>Type:</strong> <span id="detail-type"></span></p>
+      <p><strong>State:</strong> <span id="detail-state"></span></p>
+    </div>
+    <div class="breach-details-section">
+      <h4>Recommendations</h4>
+      <ul id="recommendations" class="recommendations"></ul>
+    </div>
+    <div class="breach-details-section">
+      <h4>AI Analysis</h4>
+      <p id="ai-summary"></p>
+    </div>
+  </div>
+  <div class="breach-details-section">
+    <h4>Sources</h4>
+    <div id="sources" class="sources"></div>
+  </div>
+  <button id="close-details" style="margin-top: 15px; padding: 8px 15px;">Close Details</button>
+</div>
+
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
@@ -28,66 +91,202 @@ const { data: breaches } = await supa
   .from("breach_raw")
   .select(`
     *,
-    breach_ai!inner (
+    breach_ai (
       summary
     )
   `)
   .order("inserted_at", { ascending: false })
-  .limit(50);
+  .limit(100);
 
 // Get all breach data if the join with AI summaries returns no results
-let displayData = breaches;
-if (!breaches || breaches.length === 0) {
-  const { data } = await supa
-    .from("breach_raw")
-    .select("*")
-    .order("inserted_at", { ascending: false })
-    .limit(50);
-  displayData = data;
-}
+let displayData = breaches || [];
+
+// Populate portal filter
+const portalFilter = document.getElementById('portal-filter');
+const portals = [...new Set(displayData.map(r => r._portal))].sort();
+portals.forEach(portal => {
+  const option = document.createElement('option');
+  option.value = portal;
+  option.textContent = portal;
+  portalFilter.appendChild(option);
+});
 
 // Format the table
-if (!displayData || displayData.length === 0) {
-  document.getElementById("tbl").innerHTML = `
-    <div style="padding: 20px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
-      <p>No breach data available. This could be because:</p>
-      <ul style="text-align: left; display: inline-block;">
-        <li>The GitHub Actions workflow hasn't run yet</li>
-        <li>The scrapers haven't found any new breaches</li>
-        <li>There might be an issue with the Supabase connection</li>
-      </ul>
-      <p>Check the GitHub Actions logs for more information.</p>
-    </div>
-  `;
-} else {
-  document.getElementById("tbl").innerHTML = `
-    <table>
-      <tr>
-        <th>Date</th>
-        <th>Entity</th>
-        <th>Records</th>
-        <th>Portal</th>
-        ${breaches && breaches.length > 0 ? '<th>AI Summary</th>' : ''}
-      </tr>
-      ${displayData.map(r => `
-        <tr>
-          <td>${r.notice_date || ""}</td>
-          <td>${r.entity || ""}</td>
-          <td class="${getSeverityClass(r.records)}">${formatNumber(r.records)}</td>
-          <td>${r._portal || ""}</td>
-          ${r.breach_ai ? `<td class="summary">${r.breach_ai.summary.text || ""}</td>` :
-            breaches && breaches.length > 0 ? '<td></td>' : ''}
-        </tr>
-      `).join("")}
-    </table>
-  `;
+function renderTable(data) {
+  if (!data || data.length === 0) {
+    document.getElementById("tbl").innerHTML = `
+      <div style="padding: 20px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
+        <p>No breach data available. This could be because:</p>
+        <ul style="text-align: left; display: inline-block;">
+          <li>The GitHub Actions workflow hasn't run yet</li>
+          <li>The scrapers haven't found any new breaches</li>
+          <li>There might be an issue with the Supabase connection</li>
+        </ul>
+        <p>Check the GitHub Actions logs for more information.</p>
+      </div>
+    `;
+  } else {
+    document.getElementById("tbl").innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Entity</th>
+            <th>Records</th>
+            <th>Type</th>
+            <th>Portal</th>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map((r, index) => {
+            const severity = r.breach_ai?.summary?.severity || getSeverityFromRecords(r.records);
+            return `
+              <tr class="clickable-row" data-index="${index}">
+                <td>${r.notice_date || ""}</td>
+                <td>${r.entity || ""}</td>
+                <td>${formatNumber(r.records)}</td>
+                <td>${r.breach_type || ""}</td>
+                <td>${r._portal || ""}</td>
+                <td class="${severity}">${severity.toUpperCase()}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+
+    // Add click event to rows
+    document.querySelectorAll('.clickable-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const index = row.getAttribute('data-index');
+        showBreachDetails(data[index]);
+      });
+    });
+  }
 }
 
+// Initial render
+renderTable(displayData);
+
+// Filter functionality
+const searchBox = document.getElementById('search-box');
+const severityFilter = document.getElementById('severity-filter');
+
+function applyFilters() {
+  const searchTerm = searchBox.value.toLowerCase();
+  const severityValue = severityFilter.value;
+  const portalValue = portalFilter.value;
+
+  const filteredData = displayData.filter(r => {
+    // Search filter
+    const matchesSearch = !searchTerm ||
+      (r.entity && r.entity.toLowerCase().includes(searchTerm)) ||
+      (r.breach_type && r.breach_type.toLowerCase().includes(searchTerm)) ||
+      (r.state && r.state.toLowerCase().includes(searchTerm));
+
+    // Severity filter
+    const severity = r.breach_ai?.summary?.severity || getSeverityFromRecords(r.records);
+    const matchesSeverity = severityValue === 'all' || severity === severityValue;
+
+    // Portal filter
+    const matchesPortal = portalValue === 'all' || r._portal === portalValue;
+
+    return matchesSearch && matchesSeverity && matchesPortal;
+  });
+
+  renderTable(filteredData);
+}
+
+searchBox.addEventListener('input', applyFilters);
+severityFilter.addEventListener('change', applyFilters);
+portalFilter.addEventListener('change', applyFilters);
+
+// Breach details functionality
+function showBreachDetails(breach) {
+  const detailsElement = document.getElementById('breach-details');
+
+  // Set basic details
+  document.getElementById('breach-title').textContent = `Breach: ${breach.entity}`;
+  document.getElementById('detail-entity').textContent = breach.entity || 'Unknown';
+  document.getElementById('detail-records').textContent = formatNumber(breach.records);
+  document.getElementById('detail-notice-date').textContent = breach.notice_date || 'Unknown';
+  document.getElementById('detail-breach-date').textContent = breach.breach_date || 'Unknown';
+  document.getElementById('detail-type').textContent = breach.breach_type || 'Unknown';
+  document.getElementById('detail-state').textContent = breach.state || 'Unknown';
+
+  // Set AI-enhanced details if available
+  if (breach.breach_ai && breach.breach_ai.summary) {
+    const summary = breach.breach_ai.summary;
+
+    document.getElementById('detail-severity').textContent = summary.severity.toUpperCase();
+    document.getElementById('detail-severity').className = summary.severity;
+
+    document.getElementById('impact-assessment').textContent = summary.impact_assessment || '';
+    document.getElementById('ai-summary').textContent = summary.text || '';
+
+    // Recommendations
+    const recommendationsElement = document.getElementById('recommendations');
+    recommendationsElement.innerHTML = '';
+    if (summary.recommendations && summary.recommendations.length > 0) {
+      summary.recommendations.forEach(rec => {
+        const li = document.createElement('li');
+        li.textContent = rec;
+        recommendationsElement.appendChild(li);
+      });
+    } else {
+      recommendationsElement.innerHTML = '<li>No specific recommendations available.</li>';
+    }
+
+    // Sources
+    const sourcesElement = document.getElementById('sources');
+    sourcesElement.innerHTML = '';
+    if (summary.sources && summary.sources.length > 0) {
+      summary.sources.forEach(source => {
+        const p = document.createElement('p');
+        p.innerHTML = `<a href="${source}" target="_blank">${source}</a>`;
+        sourcesElement.appendChild(p);
+      });
+    } else {
+      sourcesElement.textContent = 'No external sources available.';
+    }
+  } else {
+    // Default values if no AI summary
+    const severity = getSeverityFromRecords(breach.records);
+    document.getElementById('detail-severity').textContent = severity.toUpperCase();
+    document.getElementById('detail-severity').className = severity;
+
+    document.getElementById('impact-assessment').textContent =
+      `This breach at ${breach.entity} has affected ${formatNumber(breach.records)} individuals.`;
+
+    document.getElementById('ai-summary').textContent =
+      'No AI analysis available for this breach.';
+
+    document.getElementById('recommendations').innerHTML =
+      '<li>Monitor your accounts for suspicious activity.</li>' +
+      '<li>Consider changing passwords for affected accounts.</li>';
+
+    document.getElementById('sources').textContent = 'No external sources available.';
+  }
+
+  // Show the details
+  detailsElement.style.display = 'block';
+
+  // Scroll to details
+  detailsElement.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Close details button
+document.getElementById('close-details').addEventListener('click', () => {
+  document.getElementById('breach-details').style.display = 'none';
+});
+
 // Helper functions
-function getSeverityClass(records) {
-  if (!records) return "";
+function getSeverityFromRecords(records) {
+  if (!records) return "low";
+  if (records >= 100000) return "critical";
   if (records >= 10000) return "high";
-  if (records >= 2500) return "medium";
+  if (records >= 1000) return "medium";
   return "low";
 }
 

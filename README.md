@@ -43,6 +43,7 @@ Add the following secrets to your GitHub repository:
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_KEY` - Your Supabase service role key
 - `APIFY_TOKEN` - Your Apify API token
+- `FIRECRAWL_API_KEY` - Your Firecrawl API key for web research
 - `SLACK_WEBHOOK` (optional) - Your Slack incoming webhook URL
 
 ### 5. GitHub Pages (for Dashboard)
@@ -82,8 +83,19 @@ If you need to update the dashboard:
 - Add more portals by updating `scrapers/config.yaml`
 - Modify the dashboard in `dashboard/index.html`
 - The Edge Function for AI summaries is already set up
-  - You can modify it in the Supabase dashboard under Edge Functions > enrich
-  - Implement your preferred AI integration (e.g., OpenAI, Claude) in the Edge Function
+  - Uses Firecrawl for web research on breaches
+  - Generates comprehensive summaries with impact assessments and recommendations
+  - Provides sources for further investigation
+
+### AI-Powered Features
+
+The dashboard now includes advanced AI features:
+
+1. **Web Research**: Automatically searches the web for information about each breach
+2. **Impact Assessment**: Analyzes the severity and potential impact of the breach
+3. **Personalized Recommendations**: Provides specific recommendations based on breach type
+4. **Source Tracking**: Lists sources used in the research for verification
+5. **Interactive Dashboard**: Filter breaches by severity, portal, or search terms
 
 ## Troubleshooting
 

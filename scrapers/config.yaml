@@ -99,7 +99,6 @@ texas:
   schedule: "0 * * * *"
 
 privacy_rights:
-  type: html
+  type: firecrawl
   url: "https://privacyrights.org/data-breaches"
-  selector: "table tbody tr"  # Fields: entity, breach_date, notice_date, records, breach_type, entity_type, state, notice_url
   schedule: "*/30 * * * *"
