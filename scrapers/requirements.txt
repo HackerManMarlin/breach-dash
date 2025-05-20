@@ -2,4 +2,4 @@ requests
 selectolax
 PyYAML
 croniter
-firecrawl-mcp
+firecrawl
