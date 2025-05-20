@@ -1,3 +1,8 @@
+hhs:
+  type: csv
+  url: "https://ocrportal.hhs.gov/ocr/breach/breach_report.jsf?download=true"
+  schedule: "*/15 * * * *"
+
 de_ag:
   type: html
   url:  "https://attorneygeneral.delaware.gov/fraud/cpu/securitybreachnotification/database/"
@@ -87,6 +92,11 @@ wi_datcp:
   url:  "https://datcp.wi.gov/Pages/Programs_Services/DataBreaches.aspx"
   selector: "table#DataTables_Table_0 > tbody > tr"
   schedule: "*/30 * * * *"
+
+texas:
+  type: js-apify
+  actor: "your-username/tx-breach-playwright"
+  schedule: "0 * * * *"
 
 privacy_rights:
   type: html
