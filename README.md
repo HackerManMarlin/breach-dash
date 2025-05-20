@@ -47,13 +47,27 @@ Add the following secrets to your GitHub repository:
 
 ### 5. GitHub Pages (for Dashboard)
 
-Enable GitHub Pages for your repository:
+The dashboard is already set up on the gh-pages branch. To enable GitHub Pages:
 1. Go to repository Settings → Pages
 2. Set Source to "Deploy from a branch"
-3. Select the main branch and /dashboard folder
+3. Select the gh-pages branch and / (root) folder
 4. Save
 
 Your dashboard will be available at `https://<username>.github.io/breach-dash/`
+
+If you need to update the dashboard:
+1. Make changes to the dashboard/index.html file in the main branch
+2. Run the following commands to update the gh-pages branch:
+   ```bash
+   git checkout gh-pages
+   git checkout main -- dashboard/index.html
+   mv dashboard/index.html .
+   git rm -rf dashboard
+   git add .
+   git commit -m "Update dashboard"
+   git push origin gh-pages
+   git checkout main
+   ```
 
 ## How It Works
 
@@ -70,6 +84,35 @@ Your dashboard will be available at `https://<username>.github.io/breach-dash/`
 - The Edge Function for AI summaries is already set up
   - You can modify it in the Supabase dashboard under Edge Functions > enrich
   - Implement your preferred AI integration (e.g., OpenAI, Claude) in the Edge Function
+
+## Troubleshooting
+
+### No Data in Dashboard
+If your dashboard shows "No breach data available", check the following:
+
+1. **GitHub Actions**: Make sure the GitHub Actions workflow has run successfully
+   - Go to the Actions tab in your repository
+   - Check if the scrape workflow has run and completed successfully
+   - If there are errors, fix them and re-run the workflow
+
+2. **Supabase Connection**: Check if the dashboard can connect to Supabase
+   - Open the dashboard and click on "Debug Information"
+   - Check the Connection Status and Raw Data Count
+   - If there's a connection error, verify your Supabase URL and anon key
+
+3. **Sample Data**: You can add sample data directly to Supabase
+   - Go to the Supabase dashboard → Table Editor → breach_raw
+   - Click "Insert row" and add some sample data
+   - Refresh your dashboard to see if the data appears
+
+### GitHub Pages Not Working
+If your GitHub Pages site is not available:
+
+1. Go to repository Settings → Pages
+2. Make sure the Source is set to "Deploy from a branch"
+3. Select the gh-pages branch and / (root) folder
+4. Check the "GitHub Pages" section for any error messages
+5. Wait a few minutes for the site to be published
 
 ## Cost
 
