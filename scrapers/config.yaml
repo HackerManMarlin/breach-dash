@@ -2,78 +2,94 @@ de_ag:
   type: html
   url:  "https://attorneygeneral.delaware.gov/fraud/cpu/securitybreachnotification/database/"
   selector: "table tbody tr"
+  schedule: "*/30 * * * *"
 
 hi_ag:
   type: html
   url:  "https://cca.hawaii.gov/ocp/notices/security-breach/"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 in_ag:
   type: html
   url:  "https://www.in.gov/attorneygeneral/2874.htm"
   selector: "table#breachTable > tbody > tr"
+  schedule: "*/30 * * * *"
 
 ia_ag:
   type: html
   url:  "https://www.iowaattorneygeneral.gov/for-consumers/security-breach-notifications/"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 me_ag:
   type: html
   url:  "https://www.maine.gov/ag/consumer/identity_theft/index.shtml"
   selector: "table#dataTable > tbody > tr"
+  schedule: "*/30 * * * *"
 
 md_ag:
   type: html
   url:  "http://www.marylandattorneygeneral.gov/Pages/IdentityTheft/breachnotices.aspx"
   selector: "table#ctl00_ContentPlaceHolder1_gvBreachNotices > tbody > tr"
+  schedule: "*/30 * * * *"
 
 ma_ag:
   type: html
   url:  "https://www.mass.gov/lists/data-breach-notification-reports"
   selector: "table.dataTable > tbody > tr"
+  schedule: "*/30 * * * *"
 
 mt_ag:
   type: html
   url:  "https://dojmt.gov/consumer/databreach/"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 nh_ag:
   type: html
   url:  "https://www.doj.nh.gov/consumer/security-breaches/index.htm"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 nj_ag:
   type: html
   url:  "https://www.cyber.nj.gov/data-breach-alerts"
   selector: ".data-table tbody tr"
+  schedule: "*/30 * * * *"
 
 nd_ag:
   type: html
   url:  "https://attorneygeneral.nd.gov/consumer-resources/data-breach-notices"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 ok_cyber:
   type: html
   url:  "https://cybersecurity.ok.gov/breaches"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 vt_ag:
   type: html
   url:  "http://ago.vermont.gov/data-security-breaches/"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 wa_ag:
   type: html
   url:  "http://www.atg.wa.gov/data-breach-notifications"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 wi_datcp:
   type: html
   url:  "https://datcp.wi.gov/Pages/Programs_Services/DataBreaches.aspx"
   selector: "table#DataTables_Table_0 > tbody > tr"
+  schedule: "*/30 * * * *"
 
 privacy_rights:
   type: html
   url: "https://privacyrights.org/data-breaches"
   selector: "table tbody tr"  # Fields: entity, breach_date, notice_date, records, breach_type, entity_type, state, notice_url
+  schedule: "*/30 * * * *"
