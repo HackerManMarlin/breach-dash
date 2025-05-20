@@ -1,4 +1,0 @@
-requests
-selectolax
-PyYAML
-croniter
