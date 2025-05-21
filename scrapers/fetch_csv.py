@@ -1,4 +1,5 @@
-import csv, hashlib, io, json, requests, datetime as dt, utils
+import csv, hashlib, io, json, requests, datetime as dt
+from . import utils
 
 def run(portal):
     print(f"Fetching CSV for portal: {portal['id']} from URL: {portal['url']}")

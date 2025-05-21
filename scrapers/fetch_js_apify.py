@@ -1,4 +1,5 @@
-import requests, os, utils, time, hashlib, json
+import requests, os, time, hashlib, json
+from . import utils
 
 def run(portal):
     res = requests.post(
