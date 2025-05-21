@@ -1,6 +1,6 @@
 import os, json, datetime as dt
 from . import utils
-from firecrawl_mcp import firecrawl_scrape, firecrawl_extract
+from firecrawl import firecrawl_scrape, firecrawl_extract
 
 def run(portal):
     print(f"Running Firecrawl scraper for {portal['id']}...")
