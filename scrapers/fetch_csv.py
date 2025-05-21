@@ -8,6 +8,7 @@ def run(portal):
         response.raise_for_status()  # Raise an exception for HTTP errors
         text = response.text
         print(f"Successfully fetched CSV for {portal['id']}. Content length: {len(text)}")
+        print(f"Beginning of fetched text for {portal['id']}: {text[:500]}")
     except requests.exceptions.RequestException as e:
         print(f"Error fetching CSV for {portal['id']}: {e}")
         return # Stop processing this portal if fetch fails

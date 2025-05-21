@@ -4,3 +4,4 @@ PyYAML
 croniter
 firecrawl
 supabase
+firecrawl-mcp
