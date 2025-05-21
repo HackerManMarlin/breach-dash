@@ -3,7 +3,33 @@ import requests, hashlib, json, datetime as dt
 from . import utils
 
 def run(portal):
-    html = HTMLParser(requests.get(portal["url"], timeout=30).text)
+    response_text = None
+    try:
+        # Try with SSL verification first
+        print(f"Fetching HTML for {portal['id']} from {portal[\'url\']} with SSL verification...")
+        response = requests.get(portal["url"], timeout=30, verify=True)
+        response.raise_for_status()
+        response_text = response.text
+        print(f"Successfully fetched HTML for {portal['id']} with SSL verification.")
+    except requests.exceptions.SSLError as ssl_err:
+        print(f"Warning: SSL verification failed for {portal[\'url\']}: {ssl_err}. Retrying with verify=False.")
+        try:
+            response = requests.get(portal["url"], timeout=30, verify=False)
+            response.raise_for_status()
+            response_text = response.text
+            print(f"Successfully fetched HTML for {portal['id']} without SSL verification.")
+        except requests.exceptions.RequestException as e_no_verify:
+            print(f"Error fetching HTML for {portal['id']} from {portal[\'url\']} (even without SSL verify): {e_no_verify}")
+            return # Stop processing this portal if fetch fails
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching HTML for {portal['id']} from {portal[\'url\']}: {e}")
+        return # Stop processing this portal if fetch fails
+
+    if response_text is None:
+        print(f"Error: Failed to get response text for {portal['id']}")
+        return
+
+    html = HTMLParser(response_text)
     for tr in html.css(portal["selector"]):
         cols = [c.text(strip=True) for c in tr.css("td")]
         if portal["id"] == "privacy_rights":
@@ -22,10 +48,19 @@ def run(portal):
             }
         else:
             if len(cols) < 3: continue
+            parsed_records = 0 # Default
+            if len(cols) > 2: # Check if cols[2] exists
+                try:
+                    records_str = cols[2].replace(",", "").strip()
+                    if records_str: # Check if not empty
+                        parsed_records = int(records_str)
+                except ValueError:
+                    print(f"Warning: Could not parse records from '{cols[2]}' for {portal['id']}. Using 0.")
+            
             row = {
-                "notice_date": cols[0],
-                "entity": cols[1],
-                "records": int(cols[2].replace(",", "") or 0),
+                "notice_date": cols[0] if len(cols) > 0 else "",
+                "entity": cols[1] if len(cols) > 1 else "",
+                "records": parsed_records,
                 "_portal": portal["id"]
             }
         utils.insert_row(row)
