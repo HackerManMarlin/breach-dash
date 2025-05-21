@@ -1,4 +1,5 @@
-import os, utils, json, datetime as dt
+import os, json, datetime as dt
+from . import utils
 from firecrawl_mcp import firecrawl_scrape, firecrawl_extract
 
 def run(portal):

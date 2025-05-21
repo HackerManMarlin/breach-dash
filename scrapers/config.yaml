@@ -94,7 +94,7 @@ wi_datcp:
   schedule: "*/30 * * * *"
 
 texas:
-  type: js-apify
+  type: js_apify
   actor: "your-username/tx-breach-playwright"
   schedule: "0 * * * *"
 

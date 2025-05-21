@@ -1,5 +1,6 @@
 from selectolax.parser import HTMLParser
-import requests, hashlib, json, utils, datetime as dt
+import requests, hashlib, json, datetime as dt
+from . import utils
 
 def run(portal):
     html = HTMLParser(requests.get(portal["url"], timeout=30).text)
