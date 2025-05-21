@@ -28,7 +28,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-        run: python scrapers/main.py
+        run: python -m scrapers.main
 
       - name: Update GitHub Pages
         if: github.ref == 'refs/heads/main'
