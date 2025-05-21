@@ -8,7 +8,11 @@ def run_due_portals():
     now = dt.datetime.utcnow()
     for portal in CFG.values():
         itr = croniter.croniter(portal["schedule"], now - dt.timedelta(minutes=1))
-        if itr.get_next(dt.datetime) <= now:
+        print(f"Checking portal: {portal['id']}, schedule: {portal['schedule']}")
+        next_run_time = itr.get_next(dt.datetime)
+        print(f"Calculated next run time for {portal['id']}: {next_run_time}, Current time: {now}")
+        if next_run_time <= now:
+            print(f"Running portal: {portal['id']}")
             mod = importlib.import_module(f"scrapers.fetch_{portal['type']}")
             mod.run(portal)
 
