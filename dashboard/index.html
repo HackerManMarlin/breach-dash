@@ -153,34 +153,57 @@
 </div>
 
 <script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+// import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-const supa = createClient("https://ejltctxcnootgerwxneq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqbHRjdHhjbm9vdGdlcnd4bmVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MTYzODUsImV4cCI6MjA2MzE5MjM4NX0.SCe8tnVQGui8XtAsKBNa7RrVKpoi9VXLbJ-tl50s73c");
+// const supa = createClient("https://ejltctxcnootgerwxneq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqbHRjdHhjbm9vdGdlcnd4bmVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2MTYzODUsImV4cCI6MjA2MzE5MjM4NX0.SCe8tnVQGui8XtAsKBNa7RrVKpoi9VXLbJ-tl50s73c");
 
-// Get breach data with AI summaries
-const { data: breaches } = await supa
-  .from("breach_raw")
-  .select(`
-    *,
-    breach_ai (
-      summary
-    )
-  `)
-  .order("inserted_at", { ascending: false })
-  .limit(100);
+  let allBreachData = []; // To store all data fetched from JSON
+  let displayData = [];   // To store currently displayed/filtered data
 
-// Get all breach data if the join with AI summaries returns no results
-let displayData = breaches || [];
+  async function loadBreachData() {
+    try {
+      const response = await fetch('./data/privacyrights_breaches.json');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      allBreachData = await response.json();
+      // Ensure all items have a defined value for fields used in sorting or filtering, even if null
+      allBreachData = allBreachData.map(item => ({
+        ...item,
+        org_name: item.org_name || "Unknown",
+        reported_date: item.reported_date || "N/A",
+        total_affected: item.total_affected === undefined ? null : item.total_affected, // Keep null as is for severity check
+        breach_type: item.breach_type || "N/A",
+        organization_type: item.organization_type || "N/A"
+      }));
+      displayData = [...allBreachData]; // Initialize displayData
+      // Sort by reported_date descending initially, handling potential null or invalid dates
+      displayData.sort((a, b) => {
+        const dateA = a.reported_date ? new Date(a.reported_date) : new Date(0);
+        const dateB = b.reported_date ? new Date(b.reported_date) : new Date(0);
+        if (isNaN(dateA.getTime())) return 1; // Push invalid dates to the end
+        if (isNaN(dateB.getTime())) return -1;
+        return dateB - dateA;
+      });
+      // renderTable(displayData); // Will be called after filters are set up
+    } catch (error) {
+      console.error("Could not load breach data:", error);
+      document.getElementById("tbl").innerHTML = `<p style="color:red;">Error loading breach data. Please check the console and ensure 'dashboard/data/privacyrights_breaches.json' exists and is valid.</p>`;
+    }
+  }
+  // Call loadBreachData immediately and then render.
+  // The rest of the script (filters, etc.) depends on allBreachData being populated.
+  await loadBreachData();
 
 // Populate portal filter
-const portalFilter = document.getElementById('portal-filter');
-const portals = [...new Set(displayData.map(r => r._portal))].sort();
-portals.forEach(portal => {
-  const option = document.createElement('option');
-  option.value = portal;
-  option.textContent = portal;
-  portalFilter.appendChild(option);
-});
+// const portalFilter = document.getElementById('portal-filter');
+// const portals = [...new Set(allBreachData.map(r => r._portal))].sort(); // Changed displayData to allBreachData
+// portals.forEach(portal => {
+//   const option = document.createElement('option');
+//   option.value = portal;
+//   option.textContent = portal;
+//   portalFilter.appendChild(option);
+// });
 
 // Format the table
 function renderTable(data) {
@@ -201,26 +224,26 @@ function renderTable(data) {
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Entity</th>
-            <th>Records</th>
-            <th>Type</th>
-            <th>Portal</th>
+            <th>Reported Date</th>
+            <th>Organization Name</th>
+            <th>Records Affected</th>
+            <th>Breach Type</th>
+            <th>Org Type</th>
             <th>Severity</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${data.map((r, index) => {
-            const severity = r.breach_ai?.summary?.severity || getSeverityFromRecords(r.records);
-            const hasAiAnalysis = r.breach_ai && r.breach_ai.summary;
+          ${dataToRender.map((item) => {
+            const severity = getSeverityFromRecords(item.total_affected);
+            // const hasAiAnalysis = r.breach_ai && r.breach_ai.summary;
             return `
               <tr>
-                <td>${r.notice_date || ""}</td>
-                <td>${r.entity || ""}</td>
-                <td>${formatNumber(r.records)}</td>
-                <td>${r.breach_type || ""}</td>
-                <td>${r._portal || ""}</td>
+                <td>${item.reported_date || "N/A"}</td>
+                <td>${item.org_name || "N/A"}</td>
+                <td>${formatNumber(item.total_affected)}</td>
+                <td>${item.breach_type || "N/A"}</td>
+                <td>${item.organization_type || "N/A"}</td>
                 <td class="${severity}">${severity.toUpperCase()}</td>
                 <td class="actions-column">
                   <button class="btn btn-secondary view-details-btn" data-index="${index}">Details</button>
@@ -238,8 +261,12 @@ function renderTable(data) {
     // Add click event to view details buttons
     document.querySelectorAll('.view-details-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const index = btn.getAttribute('data-index');
-        showBreachDetails(data[index]);
+        const originalIndex = parseInt(btn.getAttribute('data-item-index'), 10);
+        if (originalIndex >= 0 && originalIndex < allBreachData.length) {
+          showBreachDetails(allBreachData[originalIndex]);
+        } else {
+          console.error("Invalid index for breach details:", originalIndex);
+        }
       });
     });
   }
@@ -255,23 +282,23 @@ const severityFilter = document.getElementById('severity-filter');
 function applyFilters() {
   const searchTerm = searchBox.value.toLowerCase();
   const severityValue = severityFilter.value;
-  const portalValue = portalFilter.value;
+  // const portalValue = portalFilter.value;
 
-  const filteredData = displayData.filter(r => {
+  const filteredData = displayData.filter(item => {
     // Search filter
     const matchesSearch = !searchTerm ||
-      (r.entity && r.entity.toLowerCase().includes(searchTerm)) ||
-      (r.breach_type && r.breach_type.toLowerCase().includes(searchTerm)) ||
-      (r.state && r.state.toLowerCase().includes(searchTerm));
+      (item.org_name && item.org_name.toLowerCase().includes(searchTerm)) ||
+      (item.breach_type && item.breach_type.toLowerCase().includes(searchTerm)) ||
+      (item.organization_type && item.organization_type.toLowerCase().includes(searchTerm));
 
     // Severity filter
-    const severity = r.breach_ai?.summary?.severity || getSeverityFromRecords(r.records);
+    const severity = getSeverityFromRecords(item.total_affected);
     const matchesSeverity = severityValue === 'all' || severity === severityValue;
 
     // Portal filter
-    const matchesPortal = portalValue === 'all' || r._portal === portalValue;
+    // const matchesPortal = portalValue === 'all' || r._portal === portalValue;
 
-    return matchesSearch && matchesSeverity && matchesPortal;
+    return matchesSearch && matchesSeverity;
   });
 
   renderTable(filteredData);
@@ -279,166 +306,86 @@ function applyFilters() {
 
 searchBox.addEventListener('input', applyFilters);
 severityFilter.addEventListener('change', applyFilters);
-portalFilter.addEventListener('change', applyFilters);
+// portalFilter.addEventListener('change', applyFilters);
 
 // Global variable to store the current breach being viewed
 let currentBreach = null;
 
 // Breach details functionality
 function showBreachDetails(breach) {
-  // Store the current breach for use in the AI analysis
-  currentBreach = breach;
+  currentBreach = breach; // Keep this for potential future AI use
 
-  const detailsElement = document.getElementById('breach-details');
+  const detailsElement = document.getElementById('breach-details'); // Keep for showing/scrolling
 
-  // Set basic details
-  document.getElementById('breach-title').textContent = `Breach: ${breach.entity}`;
-  document.getElementById('detail-entity').textContent = breach.entity || 'Unknown';
-  document.getElementById('detail-records').textContent = formatNumber(breach.records);
-  document.getElementById('detail-notice-date').textContent = breach.notice_date || 'Unknown';
-  document.getElementById('detail-breach-date').textContent = breach.breach_date || 'Unknown';
-  document.getElementById('detail-type').textContent = breach.breach_type || 'Unknown';
-  document.getElementById('detail-state').textContent = breach.state || 'Unknown';
+  document.getElementById('breach-title').textContent = `Breach: ${breach.org_name || 'N/A'}`;
+  document.getElementById('detail-entity').textContent = breach.org_name || 'N/A';
+  document.getElementById('detail-records').textContent = formatNumber(breach.total_affected);
+  document.getElementById('detail-notice-date').textContent = breach.reported_date || 'N/A';
+  document.getElementById('detail-breach-date').textContent = 'N/A'; 
+  document.getElementById('detail-type').textContent = breach.breach_type || 'N/A';
+  document.getElementById('detail-state').textContent = 'N/A'; 
 
-  // Set severity based on records
-  const severity = getSeverityFromRecords(breach.records);
+  const severity = getSeverityFromRecords(breach.total_affected); 
   document.getElementById('detail-severity').textContent = severity.toUpperCase();
   document.getElementById('detail-severity').className = severity;
 
-  // Handle AI analysis section
+  // Simplified AI section
   const aiPlaceholder = document.getElementById('ai-analysis-placeholder');
   const aiLoading = document.getElementById('ai-analysis-loading');
   const aiResults = document.getElementById('ai-analysis-results');
+  const runAiButton = document.getElementById('run-ai-analysis'); 
 
-  // Reset AI sections
-  aiPlaceholder.style.display = 'block';
-  aiLoading.style.display = 'none';
-  aiResults.style.display = 'none';
-
-  // If AI analysis is already available, show it
-  if (breach.breach_ai && breach.breach_ai.summary) {
-    showAiResults(breach.breach_ai.summary);
+  if (aiPlaceholder) aiPlaceholder.style.display = 'block';
+  if (aiLoading) aiLoading.style.display = 'none';
+  if (aiResults) aiResults.style.display = 'none';
+  
+  if (aiPlaceholder) {
+    aiPlaceholder.innerHTML = '<p>AI analysis feature is under development. More details from the breach include:</p>' +
+                              `<p><strong>Organization Type:</strong> ${breach.organization_type || 'N/A'}</p>` +
+                              `<p><strong>Incident Details:</strong> ${breach.incident_details || 'N/A'}</p>` +
+                              `<p><strong>Source URL:</strong> ${breach.source_url ? `<a href="${breach.source_url}" target="_blank">${breach.source_url}</a>` : 'N/A'}</p>` +
+                              `<p><strong>Original Notification URL:</strong> ${breach.notification_url_original ? `<a href="${breach.notification_url_original}" target="_blank">${breach.notification_url_original}</a>` : 'N/A'}</p>`;
   }
+  if(runAiButton) runAiButton.style.display = 'none'; 
 
-  // Show the details
-  detailsElement.style.display = 'block';
-
-  // Scroll to details
-  detailsElement.scrollIntoView({ behavior: 'smooth' });
+  if (detailsElement) {
+    detailsElement.style.display = 'block'; 
+    detailsElement.scrollIntoView({ behavior: 'smooth' });
+  }
 }
 
 // Function to display AI results
-function showAiResults(summary) {
+function showAiResults(summary) { // summary parameter is no longer used
+  console.log("showAiResults called (placeholder)");
   const aiPlaceholder = document.getElementById('ai-analysis-placeholder');
   const aiLoading = document.getElementById('ai-analysis-loading');
   const aiResults = document.getElementById('ai-analysis-results');
 
-  // Update AI results
-  document.getElementById('impact-assessment').textContent = summary.impact_assessment || '';
-  document.getElementById('ai-summary').textContent = summary.text || '';
-
-  // Recommendations
-  const recommendationsElement = document.getElementById('recommendations');
-  recommendationsElement.innerHTML = '';
-  if (summary.recommendations && summary.recommendations.length > 0) {
-    summary.recommendations.forEach(rec => {
-      const li = document.createElement('li');
-      li.textContent = rec;
-      recommendationsElement.appendChild(li);
-    });
-  } else {
-    recommendationsElement.innerHTML = '<li>No specific recommendations available.</li>';
+  if(aiPlaceholder) aiPlaceholder.style.display = 'none';
+  if(aiLoading) aiLoading.style.display = 'none';
+  if(aiResults) {
+    aiResults.style.display = 'block';
+    // Content is generally set by showBreachDetails or requestAiAnalysis for placeholders.
+    // This function might not be directly called anymore with the simplified flow.
+    if (!aiResults.innerHTML || !aiResults.innerHTML.includes("under development")) {
+        aiResults.innerHTML = '<p>AI analysis details would appear here if available.</p>';
+    }
   }
-
-  // Sources
-  const sourcesElement = document.getElementById('sources');
-  sourcesElement.innerHTML = '';
-  if (summary.sources && summary.sources.length > 0) {
-    summary.sources.forEach(source => {
-      const p = document.createElement('p');
-      p.innerHTML = `<a href="${source}" target="_blank">${source}</a>`;
-      sourcesElement.appendChild(p);
-    });
-  } else {
-    sourcesElement.textContent = 'No external sources available.';
-  }
-
-  // Show results and hide other sections
-  aiPlaceholder.style.display = 'none';
-  aiLoading.style.display = 'none';
-  aiResults.style.display = 'block';
-
-  // Refresh the table to show the checkmark
-  renderTable(displayData);
+  // No need to refresh table for checkmark as that logic is removed from renderTable
 }
 
 // Function to request AI analysis
 async function requestAiAnalysis(breach) {
-  try {
-    // Show loading state
-    document.getElementById('ai-analysis-placeholder').style.display = 'none';
-    document.getElementById('ai-analysis-loading').style.display = 'block';
+  console.log("requestAiAnalysis called for:", breach.org_name);
+  const placeholder = document.getElementById('ai-analysis-placeholder');
+  const loading = document.getElementById('ai-analysis-loading');
+  const resultsDiv = document.getElementById('ai-analysis-results');
 
-    // Call the Edge Function to analyze the breach
-    const response = await fetch(`${supa.supabaseUrl}/functions/v1/enrich`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supa.supabaseKey}`
-      },
-      body: JSON.stringify(breach)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error: ${response.status} ${response.statusText}`);
-    }
-
-    // Wait a moment to allow the database to update
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Fetch the updated breach data with AI analysis
-    const { data, error } = await supa
-      .from('breach_ai')
-      .select('summary')
-      .eq('hash', breach.hash)
-      .single();
-
-    if (error) {
-      throw new Error(`Error fetching AI analysis: ${error.message}`);
-    }
-
-    if (!data || !data.summary) {
-      throw new Error('No AI analysis data returned');
-    }
-
-    // Update the current breach with the AI analysis
-    if (!currentBreach.breach_ai) {
-      currentBreach.breach_ai = { summary: data.summary };
-    } else {
-      currentBreach.breach_ai.summary = data.summary;
-    }
-
-    // Update the display with the AI results
-    showAiResults(data.summary);
-
-    // Update the breach in the displayData array
-    const index = displayData.findIndex(b => b.hash === breach.hash);
-    if (index !== -1) {
-      displayData[index] = currentBreach;
-    }
-
-  } catch (error) {
-    console.error('Error requesting AI analysis:', error);
-
-    // Show error in the results section
-    document.getElementById('ai-analysis-placeholder').style.display = 'none';
-    document.getElementById('ai-analysis-loading').style.display = 'none';
-    document.getElementById('ai-analysis-results').style.display = 'block';
-
-    document.getElementById('impact-assessment').textContent = 'Error analyzing breach data.';
-    document.getElementById('ai-summary').textContent = `An error occurred: ${error.message}`;
-    document.getElementById('recommendations').innerHTML = '<li>Please try again later.</li>';
-    document.getElementById('sources').textContent = 'No sources available due to error.';
+  if(placeholder) placeholder.style.display = 'none';
+  if(loading) loading.style.display = 'none';
+  if(resultsDiv) {
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<p>AI analysis feature is under development. This function is a placeholder.</p>';
   }
 }
 

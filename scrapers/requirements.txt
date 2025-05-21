@@ -3,3 +3,4 @@ selectolax
 PyYAML
 croniter
 firecrawl
+supabase
