@@ -99,6 +99,6 @@ texas:
   schedule: "0 * * * *"
 
 privacy_rights:
-  type: firecrawl
+  type: tableau
   url: "https://privacyrights.org/data-breaches"
   schedule: "*/30 * * * *"
