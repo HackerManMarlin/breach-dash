@@ -195,14 +195,56 @@ def run(portal):
                     for row in data:
                         # Map fields to our database schema
                         # Note: Only include fields that exist in the database schema
+
+                        # Handle date formatting - ensure it's in YYYY-MM-DD format
+                        notice_date = row.get("Notice Date", "")
+                        if notice_date and notice_date.strip():
+                            # Try to parse and format the date
+                            try:
+                                # Handle various date formats
+                                import re
+                                from datetime import datetime
+
+                                # Remove any time component
+                                notice_date = notice_date.split()[0]
+
+                                # Try to detect the format
+                                if re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', notice_date):
+                                    # MM/DD/YYYY or M/D/YYYY format
+                                    parts = notice_date.split('/')
+                                    if len(parts) == 3:
+                                        month, day, year = parts
+                                        if len(year) == 2:
+                                            year = '20' + year  # Assume 20xx for 2-digit years
+                                        notice_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                                elif re.match(r'^\d{1,2}-\d{1,2}-\d{2,4}$', notice_date):
+                                    # MM-DD-YYYY or M-D-YYYY format
+                                    parts = notice_date.split('-')
+                                    if len(parts) == 3:
+                                        month, day, year = parts
+                                        if len(year) == 2:
+                                            year = '20' + year  # Assume 20xx for 2-digit years
+                                        notice_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
+                                # Validate the date format
+                                datetime.strptime(notice_date, '%Y-%m-%d')
+                            except Exception as e:
+                                print(f"Error parsing date '{notice_date}': {str(e)}")
+                                notice_date = None
+                        else:
+                            notice_date = None
+
                         breach_data = {
                             "entity": row.get("Organization", ""),
-                            "notice_date": row.get("Notice Date", ""),
                             "records": int(row.get("Records", "0").replace(",", "") or 0),
                             "notice_url": row.get("URL", ""),
                             "_portal": portal["id"],
                             "raw": json.dumps(row)  # Store the original row data
                         }
+
+                        # Only add notice_date if it's valid
+                        if notice_date:
+                            breach_data["notice_date"] = notice_date
 
                         utils.insert_row(breach_data)
                         count += 1
@@ -235,14 +277,56 @@ def run(portal):
                     for row in reader:
                         # Map CSV fields to our database schema
                         # Note: Only include fields that exist in the database schema
+
+                        # Handle date formatting - ensure it's in YYYY-MM-DD format
+                        notice_date = row.get("reported_date", "")
+                        if notice_date and notice_date.strip():
+                            # Try to parse and format the date
+                            try:
+                                # Handle various date formats
+                                import re
+                                from datetime import datetime
+
+                                # Remove any time component
+                                notice_date = notice_date.split()[0]
+
+                                # Try to detect the format
+                                if re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', notice_date):
+                                    # MM/DD/YYYY or M/D/YYYY format
+                                    parts = notice_date.split('/')
+                                    if len(parts) == 3:
+                                        month, day, year = parts
+                                        if len(year) == 2:
+                                            year = '20' + year  # Assume 20xx for 2-digit years
+                                        notice_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                                elif re.match(r'^\d{1,2}-\d{1,2}-\d{2,4}$', notice_date):
+                                    # MM-DD-YYYY or M-D-YYYY format
+                                    parts = notice_date.split('-')
+                                    if len(parts) == 3:
+                                        month, day, year = parts
+                                        if len(year) == 2:
+                                            year = '20' + year  # Assume 20xx for 2-digit years
+                                        notice_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
+                                # Validate the date format
+                                datetime.strptime(notice_date, '%Y-%m-%d')
+                            except Exception as e:
+                                print(f"Error parsing date '{notice_date}': {str(e)}")
+                                notice_date = None
+                        else:
+                            notice_date = None
+
                         breach_data = {
                             "entity": row.get("organization_name", ""),
-                            "notice_date": row.get("reported_date", ""),
                             "records": int(row.get("total_affected", "0").replace(",", "") or 0),
                             "notice_url": row.get("notification_url", ""),
                             "_portal": portal["id"],
                             "raw": json.dumps(row)  # Store the original row data
                         }
+
+                        # Only add notice_date if it's valid
+                        if notice_date:
+                            breach_data["notice_date"] = notice_date
 
                         utils.insert_row(breach_data)
                         count += 1
