@@ -1,116 +1,124 @@
-import os, utils, json, datetime as dt, csv, io
+import os, utils, datetime as dt
 from firecrawl import FirecrawlApp
-import requests
 
 def run(portal):
     print(f"Running Firecrawl scraper for {portal['id']}...")
 
     if portal["id"] == "privacy_rights":
         # The Privacy Rights Clearinghouse website now uses Tableau visualizations
-        # and offers sample data for download. We'll download the sample CSV file.
-        sample_csv_url = "https://cdn.shopify.com/s/files/1/0571/5489/5955/files/Data_Breach_Chronology_sample.csv?v=1737963802"
+        # We need to use a different approach to extract the data
+
+        # For now, we'll use the historical data available on Tableau Public
+        # This is a temporary solution until we implement a proper Tableau scraper
+        tableau_url = "https://public.tableau.com/views/DataBreachChronologyFeatures/Above-the-ScrollSummaryMULTILAYOUT"
 
         try:
-            # Download the sample CSV file
-            response = requests.get(sample_csv_url, timeout=30)
-            response.raise_for_status()  # Raise an exception for HTTP errors
+            # Initialize the FirecrawlApp with the API key
+            api_key = os.environ.get("FIRECRAWL_API_KEY")
+            if not api_key:
+                raise ValueError("FIRECRAWL_API_KEY environment variable is not set")
 
-            # Parse the CSV data
-            csv_data = response.text
-            reader = csv.DictReader(io.StringIO(csv_data))
+            app = FirecrawlApp(api_key=api_key)
 
-            # Process each row in the CSV
-            count = 0
-            for row in reader:
-                # Map CSV fields to our database schema
-                breach_data = {
-                    "entity": row.get("organization_name", ""),
-                    "breach_date": row.get("breach_date", ""),
-                    "notice_date": row.get("reported_date", ""),
-                    "records": int(row.get("total_affected", "0").replace(",", "") or 0),
-                    "breach_type": row.get("breach_type", ""),
-                    "entity_type": row.get("organization_type", ""),
-                    "state": row.get("state", ""),
-                    "notice_url": row.get("notification_url", ""),
-                    "_portal": portal["id"],
-                    "raw": json.dumps(row)  # Store the original row data
-                }
-
-                utils.insert_row(breach_data)
-                count += 1
-
-            print(f"Inserted {count} records from {portal['id']} sample CSV")
-
-        except Exception as e:
-            print(f"Error processing Privacy Rights Clearinghouse data: {str(e)}")
-
-            # Fallback to the old method if the CSV download fails
-            try:
-                # Initialize the FirecrawlApp with the API key
-                api_key = os.environ.get("FIRECRAWL_API_KEY")
-                if not api_key:
-                    raise ValueError("FIRECRAWL_API_KEY environment variable is not set")
-
-                app = FirecrawlApp(api_key=api_key)
-
-                # Scrape the Privacy Rights Clearinghouse data breaches page
-                app.scrape_url(
-                    url=portal["url"],
-                    formats=["html"],
-                    only_main_content=True
-                )
-
-                # Extract structured data using the extract method
-                extract_config = {
-                    "prompt": "Extract all data breach records from the page. Look for any tables, visualizations, or structured data about breaches. Each record should include the organization name, breach date, date made public, number of records, type of breach, organization type, state, and source URL if available.",
-                    "system_prompt": "You are a data extraction specialist. Extract structured data from the Privacy Rights Clearinghouse data breach database. Be precise and thorough. The data may be in Tableau visualizations or other formats.",
-                    "schema": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "entity": {"type": "string"},
-                                "breach_date": {"type": "string"},
-                                "notice_date": {"type": "string"},
-                                "records": {"type": "integer"},
-                                "breach_type": {"type": "string"},
-                                "entity_type": {"type": "string"},
-                                "state": {"type": "string"},
-                                "notice_url": {"type": "string"}
-                            },
-                            "required": ["entity", "breach_date", "notice_date", "records", "breach_type", "entity_type", "state"]
-                        }
+            # Use Firecrawl to extract data from the Tableau visualization
+            # This will use AI to interpret the visualization and extract structured data
+            extract_config = {
+                "prompt": "Extract all data breach records from the Tableau visualization. Each record should include the organization name, breach date, date made public, number of records, type of breach, organization type, state, and source URL if available. The data is in a Tableau visualization titled 'Data Breach Chronology'.",
+                "system_prompt": "You are a data extraction specialist. Extract structured data from the Privacy Rights Clearinghouse data breach database Tableau visualization. Be precise and thorough. Focus on extracting the most recent breach records shown in the visualization.",
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "entity": {"type": "string"},
+                            "breach_date": {"type": "string"},
+                            "notice_date": {"type": "string"},
+                            "records": {"type": "integer"},
+                            "breach_type": {"type": "string"},
+                            "entity_type": {"type": "string"},
+                            "state": {"type": "string"},
+                            "notice_url": {"type": "string"}
+                        },
+                        "required": ["entity", "breach_date", "notice_date", "records", "breach_type", "entity_type", "state"]
                     }
                 }
+            }
 
-                extracted = app.extract(
-                    urls=[portal["url"]],
-                    prompt=extract_config["prompt"],
-                    system_prompt=extract_config["system_prompt"],
-                    schema=extract_config["schema"]
-                )
+            extracted = app.extract(
+                urls=[tableau_url],
+                prompt=extract_config["prompt"],
+                system_prompt=extract_config["system_prompt"],
+                schema=extract_config["schema"]
+            )
 
-                # Process the extracted data
-                if extracted and len(extracted) > 0:
-                    breaches = extracted[0].get("data", [])
-                    for breach in breaches:
-                        row = {
-                            "entity": breach.get("entity", ""),
-                            "breach_date": breach.get("breach_date", ""),
-                            "notice_date": breach.get("notice_date", ""),
-                            "records": breach.get("records", 0),
-                            "breach_type": breach.get("breach_type", ""),
-                            "entity_type": breach.get("entity_type", ""),
-                            "state": breach.get("state", ""),
-                            "notice_url": breach.get("notice_url", ""),
-                            "_portal": portal["id"]
-                        }
-                        utils.insert_row(row)
-                    print(f"Inserted {len(breaches)} records from {portal['id']} using fallback method")
-                else:
-                    print(f"No data extracted from {portal['id']} using fallback method")
-            except Exception as e2:
-                print(f"Fallback method also failed for Privacy Rights Clearinghouse: {str(e2)}")
+            # Process the extracted data
+            if extracted and len(extracted) > 0:
+                breaches = extracted[0].get("data", [])
+                for breach in breaches:
+                    row = {
+                        "entity": breach.get("entity", ""),
+                        "breach_date": breach.get("breach_date", ""),
+                        "notice_date": breach.get("notice_date", ""),
+                        "records": breach.get("records", 0),
+                        "breach_type": breach.get("breach_type", ""),
+                        "entity_type": breach.get("entity_type", ""),
+                        "state": breach.get("state", ""),
+                        "notice_url": breach.get("notice_url", ""),
+                        "_portal": portal["id"]
+                    }
+                    utils.insert_row(row)
+                print(f"Inserted {len(breaches)} records from {portal['id']} Tableau visualization")
+            else:
+                print(f"No data extracted from {portal['id']} Tableau visualization")
+
+                # If extraction fails, try to use the deep research capability
+                try:
+                    print("Attempting deep research on Privacy Rights Clearinghouse data breaches...")
+
+                    # Use Firecrawl's deep research capability to find and extract breach data
+                    research_results = app.deep_research(
+                        query="Extract the most recent data breaches from Privacy Rights Clearinghouse",
+                        max_depth=3,
+                        time_limit=180,
+                        max_urls=10
+                    )
+
+                    if research_results and research_results.get("finalAnalysis"):
+                        # Extract structured data from the research results
+                        analysis = research_results.get("finalAnalysis", "")
+
+                        # Use the extract method to parse the analysis into structured data
+                        structured_data = app.extract(
+                            text=analysis,
+                            prompt="Extract all data breach records mentioned in the text. Each record should include the organization name, breach date, date made public, number of records, type of breach, organization type, state, and source URL if available.",
+                            system_prompt="You are a data extraction specialist. Extract structured data about data breaches from the provided text. Be precise and thorough.",
+                            schema=extract_config["schema"]
+                        )
+
+                        if structured_data and len(structured_data) > 0:
+                            breaches = structured_data[0].get("data", [])
+                            for breach in breaches:
+                                row = {
+                                    "entity": breach.get("entity", ""),
+                                    "breach_date": breach.get("breach_date", ""),
+                                    "notice_date": breach.get("notice_date", ""),
+                                    "records": breach.get("records", 0),
+                                    "breach_type": breach.get("breach_type", ""),
+                                    "entity_type": breach.get("entity_type", ""),
+                                    "state": breach.get("state", ""),
+                                    "notice_url": breach.get("notice_url", ""),
+                                    "_portal": portal["id"]
+                                }
+                                utils.insert_row(row)
+                            print(f"Inserted {len(breaches)} records from {portal['id']} using deep research")
+                        else:
+                            print(f"No structured data extracted from deep research results")
+                    else:
+                        print(f"Deep research did not yield useful results")
+                except Exception as e3:
+                    print(f"Deep research method failed for Privacy Rights Clearinghouse: {str(e3)}")
+        except Exception as e:
+            print(f"Error processing Privacy Rights Clearinghouse data: {str(e)}")
     else:
         # For other sites that might use Firecrawl in the future
         try:
