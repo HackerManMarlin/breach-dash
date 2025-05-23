@@ -16,88 +16,135 @@ def run(portal):
             with tempfile.NamedTemporaryFile(suffix='.js', delete=False, mode='w') as f:
                 js_content = """
                 const puppeteer = require('puppeteer');
+                const https = require('https');
+
+                // Function to download data directly using Node.js https module
+                function downloadCSV(url) {
+                    return new Promise((resolve, reject) => {
+                        https.get(url, (response) => {
+                            if (response.statusCode !== 200) {
+                                reject(new Error(`Failed to download CSV: ${response.statusCode}`));
+                                return;
+                            }
+
+                            let data = '';
+                            response.on('data', (chunk) => {
+                                data += chunk;
+                            });
+
+                            response.on('end', () => {
+                                resolve(data);
+                            });
+                        }).on('error', (err) => {
+                            reject(err);
+                        });
+                    });
+                }
+
+                // Function to parse CSV data
+                function parseCSV(csvText) {
+                    const lines = csvText.split('\\n');
+                    if (lines.length < 2) {
+                        return [];
+                    }
+
+                    // Parse headers
+                    const headers = lines[0].split(',').map(header =>
+                        header.trim().replace(/^"(.*)"$/, '$1')
+                    );
+
+                    // Parse data rows
+                    const results = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+
+                        // Simple CSV parsing (doesn't handle all edge cases but works for basic CSV)
+                        const values = line.split(',').map(value =>
+                            value.trim().replace(/^"(.*)"$/, '$1')
+                        );
+
+                        const row = {};
+                        headers.forEach((header, index) => {
+                            if (index < values.length) {
+                                row[header] = values[index];
+                            }
+                        });
+
+                        results.push(row);
+                    }
+
+                    return results;
+                }
 
                 (async () => {
-                    // Launch the browser
-                    const browser = await puppeteer.launch({
-                        headless: true,
-                        args: ['--no-sandbox', '--disable-setuid-sandbox']
-                    });
-
                     try {
-                        // Open a new page
+                        console.log('Starting Privacy Rights Clearinghouse data extraction');
+
+                        // Try direct download first - this is the most reliable method
+                        try {
+                            // This URL pattern works for many Tableau Public visualizations
+                            const csvUrl = 'https://public.tableau.com/views/DataBreachChronologyFeatures/DataBreachChronology.csv';
+                            console.log('Attempting direct CSV download from:', csvUrl);
+
+                            const csvData = await downloadCSV(csvUrl);
+                            console.log('CSV downloaded successfully, length:', csvData.length);
+
+                            if (csvData && csvData.length > 0) {
+                                const parsedData = parseCSV(csvData);
+                                console.log('Parsed CSV data, row count:', parsedData.length);
+
+                                if (parsedData.length > 0) {
+                                    console.log('DATA_START');
+                                    console.log(JSON.stringify(parsedData));
+                                    console.log('DATA_END');
+                                    return;
+                                }
+                            }
+                        } catch (directDownloadError) {
+                            console.error('Direct CSV download failed:', directDownloadError.message);
+                        }
+
+                        // If direct download fails, try using a browser
+                        console.log('Falling back to browser-based extraction');
+                        const browser = await puppeteer.launch({
+                            headless: true,
+                            args: ['--no-sandbox', '--disable-setuid-sandbox']
+                        });
+
                         const page = await browser.newPage();
 
-                        // Navigate to the Tableau Public page that has the "Download" button
-                        // This is the page that shows the data breach chronology
-                        await page.goto('https://public.tableau.com/app/profile/privacy.rights.clearinghouse/viz/DataBreachChronologyFeatures/DataBreachChronology', {
+                        // Try to download the CSV using the browser
+                        await page.goto('https://public.tableau.com/views/DataBreachChronologyFeatures/DataBreachChronology.csv', {
                             waitUntil: 'networkidle2',
                             timeout: 60000
                         });
 
-                        console.log('Page loaded');
+                        // Get the page content (should be CSV)
+                        const content = await page.content();
+                        const csvMatch = content.match(/<pre[^>]*>(.*?)<\\/pre>/s);
 
-                        // Wait for the visualization to load
-                        await page.waitForSelector('canvas', { timeout: 60000 });
+                        if (csvMatch && csvMatch[1]) {
+                            const csvData = csvMatch[1];
+                            console.log('CSV extracted from browser, length:', csvData.length);
 
-                        console.log('Canvas found');
+                            const parsedData = parseCSV(csvData);
+                            console.log('Parsed CSV data, row count:', parsedData.length);
 
-                        // Wait a bit for the visualization to fully render
-                        await page.waitForTimeout(5000);
+                            if (parsedData.length > 0) {
+                                console.log('DATA_START');
+                                console.log(JSON.stringify(parsedData));
+                                console.log('DATA_END');
+                            } else {
+                                console.error('Failed to parse CSV data');
+                            }
+                        } else {
+                            console.error('Failed to extract CSV from browser response');
+                        }
 
-                        // Find and click the "Download" button
-                        const downloadButton = await page.waitForSelector('button[aria-label="Download"]', { timeout: 30000 });
-                        await downloadButton.click();
-
-                        console.log('Download button clicked');
-
-                        // Wait for the download menu to appear and click "Data"
-                        const dataOption = await page.waitForSelector('button[data-tb-test-id="DownloadData-Button"]', { timeout: 30000 });
-                        await dataOption.click();
-
-                        console.log('Data option clicked');
-
-                        // Wait for the data dialog to appear
-                        await page.waitForSelector('div[data-tb-test-id="DataDownloadDialog-Dialog"]', { timeout: 30000 });
-
-                        // Click the "Full Data" tab
-                        const fullDataTab = await page.waitForSelector('button[data-tb-test-id="FullDataTab"]', { timeout: 30000 });
-                        await fullDataTab.click();
-
-                        console.log('Full Data tab clicked');
-
-                        // Wait for the data to load
-                        await page.waitForTimeout(2000);
-
-                        // Extract the data from the table
-                        const data = await page.evaluate(() => {
-                            const rows = Array.from(document.querySelectorAll('table.datatable tbody tr'));
-                            const headers = Array.from(document.querySelectorAll('table.datatable thead th')).map(th => th.textContent.trim());
-
-                            return rows.map(row => {
-                                const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim());
-                                const rowData = {};
-
-                                headers.forEach((header, index) => {
-                                    rowData[header] = cells[index] || '';
-                                });
-
-                                return rowData;
-                            });
-                        });
-
-                        console.log('Data extracted:', JSON.stringify(data));
-
-                        // Output the data as JSON
-                        console.log('DATA_START');
-                        console.log(JSON.stringify(data));
-                        console.log('DATA_END');
-
-                    } catch (error) {
-                        console.error('Error:', error);
-                    } finally {
-                        // Close the browser
                         await browser.close();
+                    } catch (error) {
+                        console.error('Error in data extraction:', error);
                     }
                 })();
                 """
@@ -123,6 +170,12 @@ def run(portal):
                 process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 stdout, stderr = process.communicate()
 
+                # Print the output for debugging
+                print("Puppeteer stdout:")
+                print(stdout)
+                print("Puppeteer stderr:")
+                print(stderr)
+
                 # Check if the process was successful
                 if process.returncode != 0:
                     print(f"Error running Puppeteer script: {stderr}")
@@ -134,20 +187,18 @@ def run(portal):
 
                 if data_start != -1 and data_end != -1:
                     data_json = stdout[data_start + len('DATA_START'):data_end].strip()
+                    print(f"Found data JSON: {data_json[:100]}...")  # Print the first 100 chars
                     data = json.loads(data_json)
 
                     # Process the data
                     count = 0
                     for row in data:
                         # Map fields to our database schema
+                        # Note: Only include fields that exist in the database schema
                         breach_data = {
                             "entity": row.get("Organization", ""),
-                            "breach_date": row.get("Breach Date", ""),
                             "notice_date": row.get("Notice Date", ""),
                             "records": int(row.get("Records", "0").replace(",", "") or 0),
-                            "breach_type": row.get("Type", ""),
-                            "entity_type": row.get("Organization Type", ""),
-                            "state": row.get("State", ""),
                             "notice_url": row.get("URL", ""),
                             "_portal": portal["id"],
                             "raw": json.dumps(row)  # Store the original row data
@@ -159,6 +210,9 @@ def run(portal):
                     print(f"Inserted {count} records from {portal['id']} live data")
                 else:
                     print(f"Failed to extract data from Puppeteer output")
+                    print(f"stdout length: {len(stdout)}")
+                    print(f"DATA_START index: {data_start}")
+                    print(f"DATA_END index: {data_end}")
                     raise Exception("Data markers not found in Puppeteer output")
 
             except Exception as e:
@@ -180,14 +234,11 @@ def run(portal):
                     count = 0
                     for row in reader:
                         # Map CSV fields to our database schema
+                        # Note: Only include fields that exist in the database schema
                         breach_data = {
                             "entity": row.get("organization_name", ""),
-                            "breach_date": row.get("breach_date", ""),
                             "notice_date": row.get("reported_date", ""),
                             "records": int(row.get("total_affected", "0").replace(",", "") or 0),
-                            "breach_type": row.get("breach_type", ""),
-                            "entity_type": row.get("organization_type", ""),
-                            "state": row.get("state", ""),
                             "notice_url": row.get("notification_url", ""),
                             "_portal": portal["id"],
                             "raw": json.dumps(row)  # Store the original row data
